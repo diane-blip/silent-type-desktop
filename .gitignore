@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.log
+*.pth
+*.mp4
+*.avi
+*.onnx
+*.sqlite*
+.env
+silent-type-log.md
+silent_type/silent-type.ico

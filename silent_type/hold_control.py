@@ -1,0 +1,71 @@
+"""Read-only held-key state machine. No platform calls or input interception."""
+
+# Right Ctrl + Right Alt: one hand, right of the space bar, and no Windows shortcut
+# uses this pair alone. Change `hold_pair` in settings.json for another keyboard.
+PAIR = frozenset((0xA3, 0xA5))
+NAMES = {
+    0xA2: "Left Ctrl",
+    0xA3: "Right Ctrl",
+    0xA4: "Left Alt",
+    0xA5: "Right Alt",
+    0x5B: "Left Windows",
+    0x5C: "Right Windows",
+}
+MODIFIERS = (0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C)
+
+
+class HoldControl:
+    def __init__(self, settle=0.15, limit=22, pair=PAIR):
+        self.pair = frozenset(pair)
+        if len(self.pair) != 2 or not self.pair <= {0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C}:
+            raise ValueError("Choose two distinct Ctrl, Alt or Windows buttons; Shift holds are excluded.")
+        if self.pair == frozenset((0xA2, 0x5B)):
+            raise ValueError("This pair belongs to Dictate and cannot be assigned to Silent Type.")
+        self.settle = settle
+        self.limit = limit
+        self.state = "waiting"
+        self.started = None
+        self.destination = None
+        self.token = 0
+
+    def label(self):
+        return " + ".join(NAMES[key] for key in sorted(self.pair, key=lambda k: list(NAMES).index(k)))
+
+    def live(self, token):
+        return self.state == "active" and self.token == token
+
+    def observe(self, keys, destination, interrupted, now):
+        """Return start/finish/cancel commands; never call model/UI/input code."""
+        if self.state == "waiting":
+            if not keys:
+                self.state = "ready"
+            return []
+        if self.state == "ready":
+            if keys == self.pair and destination and not interrupted:
+                self.state = "pending"
+                self.started = now
+                self.destination = destination
+            elif keys - self.pair or interrupted:
+                self.state = "waiting"
+            return []
+        invalid = interrupted or bool(keys - self.pair) or destination != self.destination
+        if self.state == "pending":
+            if invalid or keys != self.pair:
+                self.state = "ready" if not keys else "waiting"
+                return []
+            if now - self.started >= self.settle:
+                self.token += 1
+                self.state = "active"
+                return [("hold_start", (self.token, self.destination))]
+            return []
+        if invalid:
+            self.state = "ready" if not keys else "waiting"
+            return [("hold_cancel", self.token)]
+        if now - self.started >= self.limit:
+            # A stuck or very long hold finishes; both keys must release to rearm.
+            self.state = "waiting"
+            return [("hold_finish", self.token)]
+        if keys != self.pair:
+            self.state = "ready" if not keys else "waiting"
+            return [("hold_finish", self.token)]
+        return []

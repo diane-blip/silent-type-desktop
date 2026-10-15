@@ -1,0 +1,107 @@
+"""Bounded inference process; a stalled model cannot block the UI/hotkey loop."""
+
+import multiprocessing as mp
+import threading
+import time
+
+
+class Cancelled(RuntimeError):
+    pass
+
+
+def run(connection, config):
+    try:
+        from .recognition import Recognizer
+
+        recognizer = Recognizer(config)
+        connection.send(("ready", recognizer.device))
+        while True:
+            try:
+                request = connection.recv()
+            except EOFError:
+                break
+            if request[0] == "quit":
+                break
+            try:
+                from .camera import decode
+
+                frames = [decode(frame) if isinstance(frame, bytes) else frame for frame in request[1]]
+                text, elapsed = recognizer.decode(frames, request[2])
+                connection.send(("text", text, elapsed))
+            except Exception as exc:
+                connection.send(("error", str(exc)))
+            finally:
+                request = None  # Release this phrase's frames before waiting again.
+    except Exception as exc:
+        try:
+            connection.send(("error", str(exc)))
+        except (EOFError, BrokenPipeError, OSError):
+            pass
+    finally:
+        connection.close()
+
+
+class ManagedRecognizer:
+    def __init__(self, config, cancelled=lambda: False):
+        self.closed = False
+        context = mp.get_context("spawn")
+        self.connection, child = context.Pipe()
+        self.process = context.Process(target=run, args=(child, config), daemon=True)
+        self.process.start()
+        child.close()
+        try:
+            answer = self.wait(60, cancelled)
+            if answer[0] != "ready":
+                raise RuntimeError(answer[1])
+            self.device = answer[1]
+        except Exception:
+            self.close()
+            raise
+
+    def wait(self, seconds, cancelled=lambda: False):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if cancelled():
+                self.close()
+                raise Cancelled("Cancelled. Nothing typed.")
+            try:
+                if self.connection.poll(0.05):
+                    return self.connection.recv()
+            except (EOFError, OSError) as exc:
+                self.close()
+                raise RuntimeError("Recognition worker stopped.") from exc
+            if self.closed or not self.process.is_alive():
+                self.close()
+                raise RuntimeError("Recognition worker stopped.")
+        self.close()
+        raise RuntimeError("Recognition timed out. Nothing typed.")
+
+    def decode(self, frames, timestamps, cancelled=lambda: False):
+        # A blocked pipe transfer must also be cancellable and time-limited.
+        def send():
+            try:
+                self.connection.send(("decode", frames, timestamps))
+            except (EOFError, BrokenPipeError, OSError):
+                self.close()
+
+        sender = threading.Thread(target=send, daemon=True)
+        sender.start()
+        try:
+            answer = self.wait(30, cancelled)
+        finally:
+            sender.join(timeout=2)
+        if answer[0] == "error":
+            raise RuntimeError(answer[1])
+        return answer[1], answer[2]
+
+    def close(self):
+        if self.closed:
+            return
+        self.closed = True
+        if self.process.is_alive():
+            self.process.terminate()
+        self.process.join(timeout=2)
+        if self.process.is_alive():
+            self.process.kill()
+            self.process.join(timeout=2)
+        self.connection.close()

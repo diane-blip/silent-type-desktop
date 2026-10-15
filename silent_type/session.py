@@ -1,0 +1,221 @@
+"""One phrase, from the held keys to typed text.
+
+A Session runs on its own thread: it records from the shared camera feed, reads
+long holds in parts while recording continues, restores casing, adds optional
+punctuation, logs and saves the phrase, then types it into the window that was
+in front when the hold began. It reports progress to the app through `post`
+and never touches Tk widgets itself.
+"""
+
+import logging
+import queue
+import threading
+import time
+from dataclasses import dataclass, field
+
+from . import windows
+from .log import append_log, log_path
+from .punctuate import punctuate
+from .state import format_text
+from .worker import Cancelled
+
+LOG = logging.getLogger(__name__)
+PART_SECONDS = 10
+
+
+class PartReader:
+    """Reads a long phrase in 10-second parts, in order, while recording continues.
+
+    The model reads short clips best and each read has a 30-second limit, so a
+    long hold is split. Parts are read during the hold, so text is ready almost
+    as soon as the keys release. A cut can fall inside a word.
+    """
+
+    def __init__(self, recognizer, cancelled):
+        self.recognizer = recognizer
+        self.cancelled = cancelled
+        self.queue = queue.Queue()
+        self.results = []
+        self.count = 0
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
+
+    def add(self, part):
+        self.count += 1
+        self.queue.put(part)
+
+    def run(self):
+        while (part := self.queue.get()) is not None:
+            if self.cancelled():
+                continue
+            frames = [frame for frame, _ in part]
+            times = [moment for _, moment in part]
+            try:
+                text, _ = self.recognizer.decode(frames, times, cancelled=self.cancelled)
+                self.results.append(text)
+            except Exception as exc:
+                LOG.info("Part unreadable: %s", exc)
+                self.results.append(exc)
+
+    def finish(self):
+        """Joined text and the number of unreadable parts."""
+        self.queue.put(None)
+        self.thread.join()
+        words = [result for result in self.results if isinstance(result, str) and result.strip()]
+        errors = [result for result in self.results if isinstance(result, Exception)]
+        if errors and not words:
+            raise errors[0]
+        return " ".join(words), len(errors)
+
+
+@dataclass
+class Signals:
+    """Thread-safe flags shared by the app, the key watcher and a session."""
+
+    finish: threading.Event = field(default_factory=threading.Event)
+    cancel: threading.Event = field(default_factory=threading.Event)
+    changed: threading.Event = field(default_factory=threading.Event)
+    stop: threading.Event = field(default_factory=threading.Event)
+
+    def reset(self):
+        self.finish.clear()
+        self.cancel.clear()
+        self.changed.clear()
+
+    def ended(self):
+        return self.finish.is_set() or self.cancel.is_set() or self.stop.is_set()
+
+    def cancelled(self):
+        return self.cancel.is_set() or self.stop.is_set()
+
+
+class Session:
+    def __init__(
+        self,
+        *,
+        feed,
+        recognizer,
+        config,
+        history,
+        signals,
+        post,
+        destination,
+        manual=False,
+        review_only=False,
+        insert=None,
+    ):
+        self.feed = feed
+        self.recognizer = recognizer
+        self.config = config
+        self.history = history
+        self.signals = signals
+        self.post = post
+        self.destination = destination
+        self.manual = manual
+        self.review_only = review_only
+        self.insert = insert  # None means windows.insert, looked up when typing
+
+    def run(self):
+        try:
+            self._run()
+        except Cancelled as exc:
+            LOG.info("Phrase cancelled")
+            self.post("status", str(exc))
+            self.post("error", str(exc))
+        except Exception as exc:
+            LOG.exception("Phrase")
+            self.post("status", str(exc))
+            self.post("error", str(exc))
+        finally:
+            self.feed.end()
+            self.post("idle")
+
+    def _wait_for_camera(self):
+        while not self.feed.live.is_set() and not self.signals.ended():
+            self._check_camera("Camera stopped. Phrase cancelled.")
+            time.sleep(0.02)
+        return self.feed.live.is_set()
+
+    def _check_camera(self, message):
+        if self.feed.error or not self.feed.running():
+            raise RuntimeError(self.feed.error or message)
+
+    def _record(self, parts):
+        """Capture until release, handing full parts to the reader. Returns seconds held."""
+        start = time.monotonic()
+        part = []
+        while not self.signals.ended():
+            self._check_camera("Camera stopped supplying frames. Phrase cancelled.")
+            if time.monotonic() - start > self.config["max_seconds"]:
+                # Stuck-key safety, as in Dictate: stop and keep everything captured.
+                LOG.info("Recording limit reached")
+                self.signals.finish.set()
+                break
+            part += self.feed.take()
+            if part and part[-1][1] - part[0][1] >= PART_SECONDS:
+                parts.add(part)
+                part = []
+            time.sleep(0.02)
+        held = time.monotonic() - start
+        part += self.feed.end()
+        return held, part
+
+    def _run(self):
+        if not self._wait_for_camera():
+            LOG.info("Released before camera was ready")
+            self.post("status", "Released before the camera was ready. Hold a moment longer.")
+            self.post("error", "Camera was still starting · hold a moment longer")
+            return
+        self.post("recording")
+        LOG.info("Recording started")
+        parts = PartReader(self.recognizer, self.signals.cancelled)
+        held, tail = self._record(parts)
+        if self.signals.cancelled():
+            parts.finish()
+            self.post("status", "Cancelled. Nothing typed.")
+            return
+        if not parts.count and (held < 0.4 or len(tail) < 2):
+            raise RuntimeError("Too short to read. Hold while you mouth the whole phrase.")
+        # A tail under 0.4 seconds after a full part holds no words.
+        if len(tail) >= 2 and tail[-1][1] - tail[0][1] >= 0.4:
+            parts.add(tail)
+        self.post("working", held)
+        LOG.info("Recognition finishing parts=%s seconds=%.1f", parts.count, held)
+        released = time.monotonic()
+        text, unreadable = parts.finish()
+        text = format_text(text, self.config["names"])
+        if text and not self.signals.cancelled():
+            text = punctuate(text, self.config)
+        if self.signals.cancelled():
+            self.post("status", "Cancelled. Nothing typed.")
+            return
+        if not text:
+            raise RuntimeError("No words recognized.")
+        try:
+            append_log(text, log_path(self.config))
+        except Exception:
+            LOG.exception("Log append")  # The log must never block typing.
+        item = self.history.add(text)
+        outcome = self.deliver(text)
+        self.history.mark(item, outcome)
+        LOG.info("Delivery outcome=%s", outcome)
+        # The phrase itself stays off the strip and tray tooltip; Recents shows it.
+        self.post("status", f"{outcome.capitalize()} · {time.monotonic() - released:.1f}s")
+        self.post("result", (outcome, text, unreadable))
+        self.post("history")
+
+    def deliver(self, text):
+        if self.review_only:
+            return "saved: review test only"
+        if self.manual:
+            return "saved: recorded in app"
+        if self.signals.changed.is_set():
+            return "saved: focus changed"
+        signals = self.signals
+        insert = self.insert or windows.insert
+        return insert(
+            text + " ",
+            self.destination,
+            lambda: not (signals.cancel.is_set() or signals.changed.is_set() or signals.stop.is_set()),
+            waiting=lambda: self.post("waiting_keys"),
+        )
