@@ -2,7 +2,7 @@
 
 The artwork is Microsoft's Segoe UI Emoji, so it is rendered on each computer
 rather than shipped in this repository. Ready shows the plain emoji; recording
-and reading add a green or amber dot; off is gray.
+and reading add a gold or light-gold dot; off is gray.
 
 `python -m silent_type.icon` writes `silent_type/silent-type.ico` for the Start
 menu shortcut and windows.
@@ -14,9 +14,11 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from . import theme
+
 SHUSH = "\U0001f92b"
 EMOJI_FONT = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "seguiemj.ttf"
-DOTS = {"recording": "#14783d", "working": "#986b00"}
+DOTS = {"recording": theme.ACCENT, "working": theme.ACCENT_LIGHT}
 ICO = Path(__file__).with_name("silent-type.ico")
 
 

@@ -19,7 +19,7 @@ from .session import Session, Signals
 from .state import History, data_dir, save_settings, settings
 
 LOG = logging.getLogger(__name__)
-RED, GREEN, AMBER, VIOLET = theme.ERROR, theme.SUCCESS, theme.WORKING, theme.ACCENT_DARK
+RED, GREEN, AMBER, VIOLET = theme.ERROR, theme.SUCCESS, theme.WORKING, theme.STATUS
 MENU_KEYS = frozenset((0xA4, 0xA5, 0x5B, 0x5C))  # Alt and Windows open menus on a lone release
 
 
@@ -165,7 +165,7 @@ class App:
 
     # -- status strip --------------------------------------------------------------
 
-    def show_indicator(self, text, color="#333333", seconds=None):
+    def show_indicator(self, text, color=theme.STATUS, seconds=None):
         self.strip_token += 1
         self.strip.show(text, color)
         if seconds:

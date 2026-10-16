@@ -8,6 +8,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from . import theme
 from .app import App
 from .state import History, settings
 
@@ -36,7 +37,7 @@ class Acceptance(App):
             self.strip.label,
             self.strip.hwnd,
         )
-        self.show_indicator("SILENT TYPE REVIEW TEST · loading model…", "#986b00")
+        self.show_indicator("SILENT TYPE REVIEW TEST · loading model…", theme.STATUS)
         self.root.after(250, self.check)
 
     def post(self, kind, value=None):
@@ -81,8 +82,8 @@ class Acceptance(App):
             self.ready_at = now
             if not self.busy:
                 self.show_indicator(
-                    f"REVIEW TEST READY · hold {self.hold_control.label()}\nWait for green, mouth a short sentence, release. Nothing typed into apps.",
-                    "#5744a0",
+                    f"REVIEW TEST READY · hold {self.hold_control.label()}\nWait for Recording, mouth a short sentence, release. Nothing typed into apps.",
+                    theme.STATUS,
                 )
         self.write_receipt()
         if not self.ending and (
@@ -92,7 +93,7 @@ class Acceptance(App):
             self.ending = True
             self.hold_control = None
             self.cancel.set()
-            self.show_indicator("Review test ended · keyboard control is off", "#5744a0")
+            self.show_indicator("Review test ended · keyboard control is off", theme.STATUS)
             self.root.after(5000, lambda: self.post("quit"))
         self.root.after(250, self.check)
 

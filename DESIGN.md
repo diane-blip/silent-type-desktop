@@ -1,22 +1,22 @@
 ---
 name: Silent Type
-description: Neutral native Windows controls with restrained teal accents.
+description: Neutral native Windows controls with shared SRC gold actions.
 colors:
-  background: "#f4f5f6"
-  surface: "#ffffff"
-  ink: "#172026"
-  muted: "#53616a"
-  accent: "#087e8b"
-  accent-dark: "#06616b"
-  edge: "#c9d0d4"
-  button-hover: "#e1ecee"
-  error: "#8b3535"
-  success: "#14783d"
-  working: "#805900"
-  recents-row: "#242e35"
-  recents-hover: "#34434d"
-  recents-muted: "#b8c5cc"
-  recents-accent: "#8ed8dc"
+  background: "#F5F5F5"
+  surface: "#FFFFFF"
+  ink: "#171717"
+  muted: "#626262"
+  accent: "#AD8326"
+  accent-dark: "#8A6820"
+  edge: "#C8C8C8"
+  button-hover: "#E6E6E6"
+  selected: "#E2E2E2"
+  status: "#252525"
+  recents-edge: "#4B4B4B"
+  recents-row: "#252525"
+  recents-hover: "#333333"
+  recents-muted: "#B8B8B8"
+  recents-accent: "#E8DBBE"
 typography:
   title:
     fontFamily: Segoe UI
@@ -60,14 +60,14 @@ components:
     padding: 8px 12px
     textColor: "{colors.ink}"
   button-primary:
-    backgroundColor: "{colors.accent-dark}"
+    backgroundColor: "{colors.accent}"
     textColor: "{colors.surface}"
     padding: 8px 12px
   button-primary-hover:
-    backgroundColor: "{colors.accent}"
-  history-selected:
     backgroundColor: "{colors.accent-dark}"
-    textColor: "{colors.surface}"
+  history-selected:
+    backgroundColor: "{colors.selected}"
+    textColor: "{colors.ink}"
     height: 32px
   phrase-review:
     backgroundColor: "{colors.surface}"
@@ -86,15 +86,17 @@ components:
 
 ## Overview
 
-Silent Type uses light gray settings, dark text, white reading surfaces and restrained teal actions. The tray recovery popup uses a dark counterpart. The user approved this neutral restyle without SRC branding or a new visual concept.
+Silent Type uses light gray settings, dark text, white reading surfaces and SRC gold actions. Its dark tray recovery popup shares the neutral gray and gold theme approved for Dictate and Snip. Native geometry and workflows remain intact.
 
 The implementation is Windows Tk/ttk with the clam theme, a custom Canvas popup and a native status window. These files describe the implemented desktop system; they do not specify a web interface. The locally rendered shushing emoji remains the application icon.
 
 ## Colors
 
-Primary accent-dark identifies manual recording and selected history. Accent supplies the active primary-button state and focus color. The popup uses the lighter recents-accent for shortcut digits and its log action.
+Accent identifies manual recording and popup shortcut chips; accent-dark is the primary-button hover color. Gold marks focus on light surfaces. Recents-accent supplies light-gold chip edges and the full-log link. History and combobox selections use selected gray with ink text.
 
-Background, surface, ink, muted and edge establish the settings hierarchy. The popup reuses ink as its shell and muted as its outline, with separate row, hover and subdued-text colors. Error, success and working are the shared theme's semantic status colors; status also has text.
+White labels on solid gold retain the approved brand exception. This pairing does not establish ordinary small-text contrast compliance.
+
+Background, surface, ink, muted and edge establish the settings hierarchy. The popup uses ink for its shell and recents-edge for its outline. Status words identify recording, progress, success and errors on the same neutral status strip. The shushing icon retains its artwork, with a gold recording dot and a light-gold working dot; off is grayscale.
 
 ## Typography
 
@@ -124,25 +126,26 @@ Settings retain ttk control geometry and the bordered rectangular phrase field. 
 
 ### Buttons and camera selector
 
-Manual recording uses the primary button. Copy, Clear history, Hide and preview use the standard button. Standard buttons have a pale active background and muted disabled text; primary buttons have edge-colored disabled text. The camera selector is readonly with 6px padding. Native theme rendering can override some requested field colors.
+Manual recording uses the primary button. Copy, Clear history, Hide and preview use the standard button. Standard buttons have a pale gray active background and muted disabled text. Disabled primary buttons use selected gray and muted text. The camera selector is readonly with 6px padding. Native theme rendering can override some requested field colors.
 
 ### History and phrase review
 
-The two-column list has 32px rows, bold headings and a vertical scrollbar. Its selected row uses teal with white text. The separate disabled text widget wraps the full selected phrase and has a one-pixel border and focus highlight. Copy selected is disabled without a valid selection; Clear history is disabled when empty. The empty list prompts recording. Clearing requires a native confirmation dialog.
+The two-column list has 32px rows, bold headings and a vertical scrollbar. Its selected row uses gray with dark text. The separate disabled text widget wraps the full selected phrase and has a one-pixel border and focus highlight. Copy selected is disabled without a valid selection; Clear history is disabled when empty. The empty list prompts recording. Clearing requires a native confirmation dialog.
 
 ### Recent phrases popup
 
-Rows support explicit mouse release on the pressed row and physical digit shortcuts. Hover changes row tone and pointer cursor. The full-log action has an L shortcut. Escape or focus loss dismisses the popup. The empty state has no copy action. This Canvas interface is not evidence of full screen-reader support.
+Rows support explicit mouse release on the pressed row and physical digit shortcuts. Gold chips retain white numerals and light-gold outlines when rows redraw. Hover changes only the neutral row tone and pointer cursor. The full-log action has an L shortcut. Escape or focus loss dismisses the popup. The empty state has no copy action. This Canvas interface is not evidence of full screen-reader support.
 
 ### Status indicator
 
-The status window stays above other windows without taking focus or mouse clicks. It uses white Segoe UI text; callers supply the status background. It must not interrupt typing or acquire foreground focus.
+The status window stays above other windows without taking focus or mouse clicks. It uses white Segoe UI text on the neutral status background. It must not interrupt typing or acquire foreground focus.
 
 ## Do's and Don'ts
 
 - Do preserve native workflows, visible status text and complete phrase recovery.
 - Do reserve enough height for review and action controls at the minimum reviewed settings size.
 - Do keep actual UI behavior in Tk/ttk and Windows APIs; the design sidecar contains no substitute HTML controls.
-- Don't introduce SRC colors, typography or branding.
+- Do keep gold for actions, gray for selections and explicit text for status.
+- Don't replace the approved native typography or geometry with marketing-page styling.
 - Don't turn the tray utility into a new visual concept or website.
 - Don't infer untested scaling, accessibility or application compatibility guarantees from the reviewed screenshots.

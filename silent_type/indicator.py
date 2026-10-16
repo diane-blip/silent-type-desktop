@@ -4,7 +4,7 @@ import ctypes as C
 import tkinter as tk
 from ctypes import wintypes as W
 
-from . import windows
+from . import theme, windows
 
 
 class Indicator:
@@ -20,7 +20,7 @@ class Indicator:
             text="",
             font=("Segoe UI", 12),
             fg="white",
-            bg="#172026",
+            bg=theme.STATUS,
             wraplength=width - 32,
             padx=16,
             pady=12,
@@ -41,7 +41,7 @@ class Indicator:
         if not u.SetLayeredWindowAttributes(self.hwnd, 0, 255, 2):
             raise C.WinError(C.get_last_error())
 
-    def show(self, text, color="#333333"):
+    def show(self, text, color=theme.STATUS):
         self.label.configure(text=text, bg=color)
         self.window.update_idletasks()
         u = windows.user32

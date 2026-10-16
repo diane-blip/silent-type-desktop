@@ -1,21 +1,23 @@
 """Recent-phrases popup: left-click the tray icon, click a row (or press its
 digit) to copy that phrase to the clipboard.
 
-Compact keyboard-operable recovery list. The neutral palette is independent of
-the author's brand; copying is always an explicit action.
+Compact keyboard-operable recovery list. Neutral surfaces and shared gold actions;
+copying is always an explicit action.
 """
 
 import ctypes
 import tkinter as tk
 import tkinter.font as tkfont
 
-INK = "#172026"
-ROW = "#242e35"
-HOVER = "#34434d"
-EDGE = "#53616a"
-PAPER = "#ffffff"
-MUTED = "#b8c5cc"
-ACCENT = "#8ed8dc"
+from .theme import ACCENT as ACTION
+from .theme import ACCENT_LIGHT as ACCENT
+from .theme import INK
+from .theme import RECENTS_EDGE as EDGE
+from .theme import RECENTS_HOVER as HOVER
+from .theme import RECENTS_MUTED as MUTED
+from .theme import RECENTS_ROW as ROW
+from .theme import SURFACE as PAPER
+
 TRANSPARENT = "#010203"  # never-drawn key color -> real rounded corners
 
 
@@ -154,15 +156,16 @@ class Recents:
                     cx + chip,
                     cy + chip // 2,
                     chip // 2,
-                    fill=ACCENT,
-                    outline="",
+                    fill=ACTION,
+                    outline=ACCENT,
+                    width=1,
                     tags=tag,
                 )
                 c.create_text(
                     cx + chip // 2,
                     cy - int(1 * s),
                     text=chip_char,
-                    fill=INK,
+                    fill=PAPER,
                     font=(disp_family, -int(12 * s), "bold"),
                     tags=tag,
                 )

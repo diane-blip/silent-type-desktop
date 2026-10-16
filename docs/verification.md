@@ -1,5 +1,16 @@
 # Release verification
 
+## 0.4.1 · October 16, 2026
+
+74 offline tests and the native window/history fixtures passed. Both runtime locks and the base PyTorch version passed advisory audits. Camera/model code and dependency locks are unchanged; no live camera or recognition test was repeated for this theme update.
+
+The implemented gold theme was compared with the approved native previews at normal and constrained sizes, including populated, empty, hover, focus and error states where applicable. Actions are gold with white labels; links and dark-surface focus are light gold; surfaces and selections are neutral gray. White on gold is an approved visual exception, not a claim of AA small-text contrast. Full screen-reader, high-contrast and mixed-DPI support remain unverified.
+
+Release assets are built from the exact commit, with hosted checks, exported-tree/history secret scans and an unauthenticated SHA-256 download check recorded in the versioned release notes. Existing personal installations are not modified.
+
+## Previous release evidence
+
+
 Version 0.4.0, Windows x64, Python 3.12, October 15, 2026.
 
 ## Evidence

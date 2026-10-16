@@ -61,7 +61,7 @@ class ReviewTests(unittest.TestCase):
         app.post("idle")
         app.drain()
         app.show_indicator.assert_called_once_with(
-            "Face was not visible throughout the phrase.", "#8b3535", None
+            "Face was not visible throughout the phrase.", "#252525", None
         )
         app.hide_indicator.assert_not_called()
         self.assertFalse(app.busy)
