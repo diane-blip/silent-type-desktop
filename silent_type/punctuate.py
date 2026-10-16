@@ -12,6 +12,8 @@ recognized words are typed unpunctuated and nothing leaves the computer.
 import logging
 import os
 import re
+import ssl
+from contextlib import ExitStack
 from pathlib import Path
 
 LOG = logging.getLogger(__name__)
@@ -56,30 +58,45 @@ def words(text):
 
 
 def same_words(punctuated, text):
-    return bool(punctuated) and words(punctuated) == words(text)
+    allowed = ".,?!'’\":;() \n\r\t"
+    return (
+        bool(punctuated)
+        and all(
+            character.isascii() and character.isalnum() or character in allowed for character in punctuated
+        )
+        and words(punctuated) == words(text)
+    )
 
 
 def punctuate(text, config, create=None):
     """Return punctuated text, or the input unchanged on any doubt or failure."""
-    if not config.get("punctuate", True) or not text.strip():
+    if not config.get("punctuate", False) or not text.strip():
         return text
     key = api_key(config)
     if not key:
         return text
     try:
-        if create is None:
-            import anthropic
+        with ExitStack() as stack:
+            if create is None:
+                import anthropic
+                import httpx2 as httpx
 
-            client = anthropic.Anthropic(api_key=key, max_retries=0, timeout=min(20.0, 5.0 + len(text) / 500))
-            create = client.messages.create
-        response = create(
-            model=config.get("punctuate_model", "claude-haiku-5-5"),
-            max_tokens=max(1000, len(text)),
-            # Haiku 5.5 thinks by default; low effort keeps a sentence fast.
-            output_config={"effort": "low"},
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": USER_TEMPLATE.format(text=text)}],
-        )
+                http = stack.enter_context(httpx.Client(verify=ssl.create_default_context()))
+                client = stack.enter_context(
+                    anthropic.Anthropic(
+                        api_key=key, http_client=http, max_retries=0, timeout=min(20.0, 5.0 + len(text) / 500)
+                    )
+                )
+                create = client.messages.create
+            response = create(
+                model=config.get("punctuate_model", "claude-haiku-5-5"),
+                max_tokens=min(16000, max(1000, len(text))),
+                output_config={"effort": "low"},
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": USER_TEMPLATE.format(text=text)}],
+            )
+        if response.stop_reason != "end_turn":
+            return text
         result = next((block.text for block in response.content if block.type == "text"), "").strip()
     except Exception as exc:
         # Type the plain words rather than fail; log only the error type, never text.

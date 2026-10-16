@@ -13,13 +13,13 @@ import threading
 import time
 import tkinter as tk
 
-from . import windows
+from . import theme, windows
 from .log import log_path
 from .session import Session, Signals
 from .state import History, data_dir, save_settings, settings
 
 LOG = logging.getLogger(__name__)
-RED, GREEN, AMBER, VIOLET = "#8b3535", "#14783d", "#986b00", "#5744a0"
+RED, GREEN, AMBER, VIOLET = theme.ERROR, theme.SUCCESS, theme.WORKING, theme.ACCENT_DARK
 MENU_KEYS = frozenset((0xA4, 0xA5, 0x5B, 0x5C))  # Alt and Windows open menus on a lone release
 
 
@@ -74,8 +74,8 @@ class App:
             self.root.iconbitmap(default=str(ICO if ICO.exists() else write_ico()))
         except Exception:
             LOG.exception("Window icon")  # cosmetic; never stop the app over it
-        self.root.geometry("730x650")
-        self.root.minsize(600, 560)
+        self.root.geometry("780x760")
+        self.root.minsize(700, 720)
         self.root.protocol("WM_DELETE_WINDOW", self.hide)
         self.build_window()
         self.build_indicator()
@@ -125,6 +125,8 @@ class App:
             on_record=lambda: self.toggle_phrase(None, manual=True),
             on_copy=self.copy_text,
             on_hide=self.hide,
+            punctuate=self.config.get("punctuate", False),
+            on_punctuate=self.change_punctuation,
         )
         self.status = self.window.status
         self.preview_button = self.window.preview_button
@@ -249,6 +251,9 @@ class App:
         self.start_phrase(original, manual=manual)
 
     def start_phrase(self, original, manual=False):
+        if not self.enabled or self.recents_open:
+            self.status.set("Turn Silent Type on and close Recents before recording.")
+            return
         if self.busy:
             LOG.info("Shortcut ignored: recording or recognition already active")
             return
@@ -322,6 +327,20 @@ class App:
         if self.persist_config:
             save_settings(self.config)
         self.feed.close()
+
+    def change_punctuation(self, enabled):
+        if self.busy:
+            self.window.punctuate.set(self.config.get("punctuate", False))
+            self.status.set("Wait for the current phrase before changing punctuation.")
+            return
+        self.config["punctuate"] = enabled
+        if self.persist_config:
+            save_settings(self.config)
+        self.status.set(
+            "Punctuation enabled; requires your Anthropic key."
+            if enabled
+            else "Punctuation off; recognition stays local."
+        )
 
     def toggle_preview(self):
         if self.busy:
@@ -524,4 +543,10 @@ def main():
         App(show="--show" in sys.argv)
     except Exception:
         LOG.exception("Application stopped unexpectedly")
+        windows.user32.MessageBoxW(
+            None,
+            "Silent Type could not start. Check settings.json and silent-type.log in the Silent Type Desktop data folder.",
+            "Silent Type",
+            0x10,
+        )
         raise

@@ -125,6 +125,7 @@ class HeldControlTests(unittest.TestCase):
             app.feed = Mock()
             app.spawn = Mock()
             with patch("silent_type.app.windows.mask_menu_key") as mask:
+                app.recents_open = False
                 app.start_phrase((1, 2))
             self.assertEqual(mask.called, masked)
 

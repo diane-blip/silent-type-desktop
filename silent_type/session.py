@@ -33,16 +33,21 @@ class PartReader:
 
     def __init__(self, recognizer, cancelled):
         self.recognizer = recognizer
-        self.cancelled = cancelled
-        self.queue = queue.Queue()
+        self.abort = threading.Event()
+        self.cancelled = lambda: self.abort.is_set() or cancelled()
+        self.queue = queue.Queue(maxsize=3)
         self.results = []
         self.count = 0
+        self.finished = False
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
 
     def add(self, part):
+        try:
+            self.queue.put_nowait(part)
+        except queue.Full as exc:
+            raise RuntimeError("Recognition cannot keep up. Try shorter phrases or a faster device.") from exc
         self.count += 1
-        self.queue.put(part)
 
     def run(self):
         while (part := self.queue.get()) is not None:
@@ -56,11 +61,26 @@ class PartReader:
             except Exception as exc:
                 LOG.info("Part unreadable: %s", exc)
                 self.results.append(exc)
+            finally:
+                frames = times = part = None
+
+    def close(self):
+        """Cancel in-flight decoding and release queued video on every exit path."""
+        self.abort.set()
+        while True:
+            try:
+                self.queue.get_nowait()
+            except queue.Empty:
+                break
+        self.queue.put_nowait(None)
+        self.thread.join(timeout=4)
 
     def finish(self):
         """Joined text and the number of unreadable parts."""
-        self.queue.put(None)
-        self.thread.join()
+        if not self.finished:
+            self.queue.put(None)
+            self.thread.join()
+            self.finished = True
         words = [result for result in self.results if isinstance(result, str) and result.strip()]
         errors = [result for result in self.results if isinstance(result, Exception)]
         if errors and not words:
@@ -169,6 +189,12 @@ class Session:
         self.post("recording")
         LOG.info("Recording started")
         parts = PartReader(self.recognizer, self.signals.cancelled)
+        try:
+            self._read_parts(parts)
+        finally:
+            parts.close()
+
+    def _read_parts(self, parts):
         held, tail = self._record(parts)
         if self.signals.cancelled():
             parts.finish()
@@ -184,7 +210,7 @@ class Session:
         released = time.monotonic()
         text, unreadable = parts.finish()
         text = format_text(text, self.config["names"])
-        if text and not self.signals.cancelled():
+        if text and not unreadable and not self.signals.cancelled():
             text = punctuate(text, self.config)
         if self.signals.cancelled():
             self.post("status", "Cancelled. Nothing typed.")
@@ -196,7 +222,7 @@ class Session:
         except Exception:
             LOG.exception("Log append")  # The log must never block typing.
         item = self.history.add(text)
-        outcome = self.deliver(text)
+        outcome = "saved: incomplete recognition; review the phrase" if unreadable else self.deliver(text)
         self.history.mark(item, outcome)
         LOG.info("Delivery outcome=%s", outcome)
         # The phrase itself stays off the strip and tray tooltip; Recents shows it.

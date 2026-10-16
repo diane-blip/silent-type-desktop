@@ -167,7 +167,7 @@ def insert(text, original, unchanged=lambda: True, waiting=lambda: None):
         return "empty"
     delivered = False
     for character in text:
-        if target() != original or not unchanged() or modifiers_down():
+        if target() != original or not unchanged() or modifiers_down() or in_menu_mode(original):
             return "saved: partial input; check destination" if delivered else "saved: focus or keys changed"
         # Modern Notepad loses Unicode characters when an entire phrase is queued
         # at once. Let the receiving app process each character; keep both UTF-16
@@ -196,7 +196,7 @@ def insert(text, original, unchanged=lambda: True, waiting=lambda: None):
 
 
 class Instance:
-    def __init__(self, name="Local\\SilentType"):
+    def __init__(self, name="Local\\SilentTypeDesktop"):
         self.handle = kernel32.CreateMutexW(None, False, name)
         self.exists = C.get_last_error() == 183
         if not self.handle:

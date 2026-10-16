@@ -29,7 +29,7 @@ def main():
     recognizer = Recognizer(config)
     print("Checkpoint architecture loaded:", recognizer.device, len(recognizer.tokens), "tokens")
     print("No microphone capture. Lip reading runs locally.")
-    on = config.get("punctuate", True) and api_key(config)
+    on = config.get("punctuate", False) and api_key(config)
     print(
         "Punctuation: "
         + ("on; recognized text goes to Anthropic" if on else "off; nothing leaves this computer")

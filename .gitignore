@@ -10,5 +10,11 @@ dist/
 *.onnx
 *.sqlite*
 .env
+.env.*
+!.env.example
+.tools/
+*.tflite
+settings.json
+.impeccable/review/
 silent-type-log.md
 silent_type/silent-type.ico

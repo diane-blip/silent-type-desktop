@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from silent_type import windows
 from silent_type.app import App
-from silent_type.state import History
+from silent_type.state import History, settings
 from silent_type.worker import ManagedRecognizer
 
 decode = ManagedRecognizer.decode
@@ -104,12 +104,14 @@ def main():
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(message)s")
     logging.getLogger("silent_type.app").setLevel(logging.INFO)
     with tempfile.TemporaryDirectory() as directory:
+        config = settings()
+        config.update(log_path=str(Path(directory) / "phrases.md"), punctuate=False)
         history = History(Path(directory) / "history.sqlite3")
         with (
             patch("silent_type.app.History", return_value=history),
             patch.object(ManagedRecognizer, "decode", measured_decode),
         ):
-            app = CameraPipeline()
+            app = CameraPipeline(config=config)
         assert not app.failed, app.failed
         assert not hasattr(app, "hotkeys")
         assert app.recognizer.closed

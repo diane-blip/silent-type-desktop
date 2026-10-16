@@ -1,0 +1,21 @@
+# Release verification
+
+Version 0.4.0, Windows x64, Python 3.12, October 15, 2026.
+
+## Evidence
+
+- A fresh CPU environment was installed through `install.ps1 -NoShortcut -SkipModels`, using the complete hashed runtime lock. Package consistency passed. Model files used for hardware acceptance were existing official files, independently verified by SHA-256; no private settings or history were imported.
+- 74 offline tests passed. Coverage includes hold/cancel state, foreground/menu guards, partial input, persistent recovery, camera startup failure, worker timeout/termination, blocked pipe transfer, bounded video backlog, capture-thread cleanup, incomplete-result handling, invalid settings, explicit punctuation opt-in, truncated/altered responses, and a real Anthropic SDK roundtrip against a fake local HTTP transport. No live cloud request was made for this release.
+- Real CPU model loading, vendor-file hashes and both model digests passed. Synthetic 25-frame mouth tensors completed inference on CPU (0.53 seconds) and CUDA (1.09 seconds, existing CUDA environment). These are smoke checks, not speech accuracy or end-to-end performance benchmarks.
+- Real webcam preview, stopping preview, tray lifecycle and shutdown passed. A 2.53-second capture (44 frames) reached the real CPU worker and returned the expected face-not-visible recovery error. No accuracy claim follows from that test.
+- Real held-key, camera and insertion test: Left Ctrl + Right Ctrl was used as an isolated test pair to avoid another installation. The editor belonged to a separate test process. Cold capture started in 5.16 seconds; the fixed fictional result was inserted exactly, both modifiers released, the camera closed after idle and after switching off. Recognition was deliberately replaced with fixed text in this test; its 0.3-second delivery timing does not measure lip reading.
+- Native UI fixtures verified selection/copy, confirmed history clearing, disabled empty-history actions, popup dismissal and the L keyboard action. Captures at 780×760 and 700×720, populated/empty settings and populated/empty Recents received an independent Impeccable review. Final disposition: ship for that scoped visual/usability review.
+- Both locked runtime dependency audits reported no known vulnerabilities. The PyTorch index variants were skipped by PyPI lookup; the underlying `torch==2.13.0` version was audited separately with no known vulnerabilities. This is a known-advisory check, not a comprehensive security assessment.
+
+## Boundaries
+
+Lip-reading accuracy on other people, lighting, cameras and languages is unmeasured. No broad desktop-app, screen-reader, high-DPI or multi-monitor certification. The guard follows a foreground window, not a text field. Input can be partial if the destination changes mid-delivery.
+
+The new CPU installer was exercised without creating a real Start shortcut or downloading another 1 GB checkpoint. Shortcut creation uses the standard Windows Shell API and is checked for ownership before modification; fresh-user install and uninstall on a second PC remain unverified. CUDA inference used an existing environment, not a fresh CUDA install.
+
+GitHub Actions checks cover software tests, not camera hardware or native screen captures. The release is an experimental source distribution, not a signed executable. Model-weight use terms remain separate and unspecified by upstream; the release contains no model weights.

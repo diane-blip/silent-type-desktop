@@ -37,7 +37,7 @@ root.after(60000, root.destroy); root.mainloop()
 
 
 def key(vk, up):
-    flags = 0x1 | (0x2 if up else 0)  # extended key: right-hand Ctrl and Alt
+    flags = (0x1 if vk in (0xA3, 0xA5, 0x5B, 0x5C) else 0) | (0x2 if up else 0)
     event = windows.INPUT(type=1, ki=windows.KEYBOARD(wVk=vk, dwFlags=flags))
     assert windows.user32.SendInput(1, C.byref(event), C.sizeof(event)) == 1
 
@@ -88,7 +88,7 @@ def main():
     script = work / "editor.py"
     script.write_text(EDITOR, encoding="utf-8")
     editor = subprocess.Popen([getattr(sys, "_base_executable", sys.executable), str(script), str(received)])
-    report = {"held_pair": "Right Ctrl + Right Alt", "recognition": "fixed phrase (not lip accuracy)"}
+    report = {"recognition": "fixed phrase (not lip accuracy)"}
     holder = {}
 
     def drive():
@@ -114,17 +114,17 @@ def main():
                 return
             pressed = time.monotonic()
             try:
-                key(0xA3, False)
+                key(config["hold_pair"][0], False)
                 time.sleep(0.05)
-                key(0xA5, False)
+                key(config["hold_pair"][1], False)
                 # The camera opens on the hold, so the first phrase waits for it.
                 while app.phase != "recording" and time.monotonic() - pressed < 6:
                     time.sleep(0.01)
                 report["press_to_recording_seconds"] = round(time.monotonic() - pressed, 2)
                 time.sleep(2)
             finally:
-                key(0xA5, True)
-                key(0xA3, True)
+                key(config["hold_pair"][1], True)
+                key(config["hold_pair"][0], True)
             end = time.monotonic() + 15
             while time.monotonic() < end and not getattr(app, "outcome", None):
                 time.sleep(0.1)
@@ -145,7 +145,10 @@ def main():
                 app.post("quit")
 
     config = settings()
-    config.update(hold_enabled=True, hold_pair=[0xA3, 0xA5], punctuate=False, camera_warm_seconds=3)
+    report["held_pair"] = config["hold_pair"]
+    config.update(
+        hold_enabled=True, punctuate=False, camera_warm_seconds=3, log_path=str(work / "phrases.md")
+    )
     history = History(work / "history.sqlite3")
     threading.Thread(target=drive, daemon=True).start()
     original_init = Delivery.__init__

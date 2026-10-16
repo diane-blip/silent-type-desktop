@@ -16,7 +16,14 @@ class Indicator:
         self.window.overrideredirect(True)
         self.window.geometry(f"{width}x48+{(root.winfo_screenwidth() - width) // 2}+8")
         self.label = tk.Label(
-            self.window, text="", font=("Segoe UI", 16), fg="white", bg="#333333", wraplength=width - 12
+            self.window,
+            text="",
+            font=("Segoe UI", 12),
+            fg="white",
+            bg="#172026",
+            wraplength=width - 32,
+            padx=16,
+            pady=12,
         )
         self.label.pack(fill="both", expand=True)
         self.window.update_idletasks()
@@ -37,7 +44,6 @@ class Indicator:
     def show(self, text, color="#333333"):
         self.label.configure(text=text, bg=color)
         self.window.update_idletasks()
-        height = max(48, self.label.winfo_reqheight() + 12)
         u = windows.user32
 
         class MonitorInfo(C.Structure):
@@ -54,7 +60,9 @@ class Indicator:
             raise C.WinError(C.get_last_error())
         work = info.rcWork
         width = min(self.width, work.right - work.left - 32)
-        self.label.configure(wraplength=width - 12)
+        self.label.configure(wraplength=width - 32)
+        self.window.update_idletasks()
+        height = max(48, self.label.winfo_reqheight())
         # NOACTIVATE | SHOWWINDOW. Small strip at the top center of the active display.
         u.SetWindowPos(
             self.hwnd, -1, (work.left + work.right - width) // 2, work.top + 8, width, height, 0x50

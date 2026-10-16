@@ -22,6 +22,7 @@ class Acceptance(App):
         self.ending = False
         config = settings()
         config.update(hold_enabled=True)
+        config["log_path"] = str(history.path.parent / "phrases.md")
         super().__init__(config=config, history=history, review_only=True)
         if hasattr(self, "stop"):
             self.write_receipt(False)

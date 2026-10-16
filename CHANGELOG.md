@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 (October 15, 2026)
+
+First public desktop edition, with a clean source history and separate data directory, shortcut and instance lock.
+
+- Neutral gray/white settings UI and restrained teal actions; neutral dark Recents, keyboard log access, and disabled empty-history actions. Camera preview opens separately.
+- Validate settings before opening devices. Reject the AltGr-generated key pair.
+- Bound queued video to three parts and close recognition threads on failed or cancelled capture. Save incomplete recognition for review instead of typing it.
+- Verify both model hashes at runtime before loading; keep restricted PyTorch weight loading.
+- Opt-in cloud punctuation, completed-response checks, strict output-character checks and deterministic HTTP-client cleanup.
+- Stream a bounded log tail instead of reading the entire history file. Store logs outside the code checkout.
+- Check for menus during insertion as well as before it.
+- CPU-default installation with explicit CUDA option; Python-version and shortcut-ownership checks; hashed binary dependencies and package consistency checks.
+- Public installation, update, privacy, provenance, contribution and verification documentation. Models and credentials are excluded from release assets.
+
 ## 0.3.1 (October 15, 2026)
 
 - The icon is now the shushing-face emoji 🤫, drawn from Windows' own emoji font on each computer (the artwork is Microsoft's, so it isn't shipped here). Recording and reading add a green or amber dot; off is gray.

@@ -113,6 +113,7 @@ def main():
     config = settings()
     config["hold_enabled"] = True  # Fixture only; never saved to machine settings.
     with tempfile.TemporaryDirectory() as directory:
+        config["log_path"] = str(Path(directory) / "phrases.md")
         history = History(Path(directory) / "history.sqlite3")
         with (
             patch("silent_type.app.settings", return_value=config),

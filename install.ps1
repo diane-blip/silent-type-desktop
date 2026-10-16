@@ -1,30 +1,60 @@
-param([string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe", [switch]$CpuOnly)
+[CmdletBinding()]
+param(
+    [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+    [switch]$Cuda,
+    [switch]$NoShortcut,
+    [switch]$SkipModels
+)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
-if (-not (Test-Path -LiteralPath $Python)) { throw 'Python 3.12 is required. Supply its path with -Python.' }
+if (-not (Test-Path -LiteralPath $Python)) { throw 'Install 64-bit Python 3.12, or supply its path with -Python.' }
+& $Python -c "import sys, struct; sys.exit(0 if sys.version_info[:2] == (3,12) and struct.calcsize('P') == 8 else 1)"
+if ($LASTEXITCODE -ne 0) { throw '64-bit Python 3.12 is required.' }
+
+# Preflight the shortcut before modifying the environment.
+$ShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Silent Type Desktop.lnk'
+$Launcher = Join-Path $PSScriptRoot 'start-silent-type.vbs'
+if (-not $NoShortcut) {
+    $Shell = New-Object -ComObject WScript.Shell
+    $Shortcut = $Shell.CreateShortcut($ShortcutPath)
+    if ((Test-Path -LiteralPath $ShortcutPath) -and $Shortcut.Arguments -ne ('"' + $Launcher + '"')) {
+        throw 'A shortcut belongs to another installation. Use -NoShortcut or remove that shortcut yourself.'
+    }
+}
 if (-not (Test-Path -LiteralPath '.venv\Scripts\python.exe')) {
     & $Python -m venv .venv
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the app environment.' }
 }
 $AppPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
-# Every package, PyTorch included, must match a SHA-256 in the lock file.
-$Lock = if ($CpuOnly) { 'requirements-cpu.lock' } else { 'requirements-cuda.lock' }
-$TorchIndex = if ($CpuOnly) { 'https://download.pytorch.org/whl/cpu' } else { 'https://download.pytorch.org/whl/cu130' }
-& $AppPython -m pip install --require-hashes --extra-index-url $TorchIndex -r $Lock
+& $AppPython -c "import sys; sys.exit(0 if sys.version_info[:2] == (3,12) else 1)"
+if ($LASTEXITCODE -ne 0) { throw 'The existing environment uses another Python version. Rename .venv and retry.' }
+& $AppPython -m pip install --upgrade pip==26.2.1
+if ($LASTEXITCODE -ne 0) { throw 'Could not update the package installer.' }
+$Lock = if ($Cuda) { 'requirements-cuda.lock' } else { 'requirements-cpu.lock' }
+$TorchIndex = if ($Cuda) { 'https://download.pytorch.org/whl/cu130' } else { 'https://download.pytorch.org/whl/cpu' }
+& $AppPython -m pip install --require-hashes --only-binary=:all: --extra-index-url $TorchIndex -r $Lock
 if ($LASTEXITCODE -ne 0) { throw 'App dependencies did not install.' }
-& $AppPython download_model.py
-if ($LASTEXITCODE -ne 0) { throw 'Model installation failed.' }
-& $AppPython doctor.py
-if ($LASTEXITCODE -ne 0) { throw 'Read the diagnostic result before starting the app.' }
-& $AppPython -m silent_type.icon  # drawn from this computer's emoji font, not shipped
+& $AppPython -m pip check
+if ($LASTEXITCODE -ne 0) { throw 'Dependency consistency check failed.' }
+if (-not $SkipModels) {
+    Write-Output 'Downloading models from their original hosts. See THIRD_PARTY.md for separate checkpoint terms.'
+    & $AppPython download_model.py
+    if ($LASTEXITCODE -ne 0) { throw 'Model installation failed.' }
+    & $AppPython doctor.py
+    if ($LASTEXITCODE -ne 0) { throw 'Read the diagnostic result before starting the app.' }
+}
+& $AppPython -m silent_type.icon
 if ($LASTEXITCODE -ne 0) { throw 'Could not draw the app icon.' }
-$Shell = New-Object -ComObject WScript.Shell
-$ShortcutFolder = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-$Shortcut = $Shell.CreateShortcut((Join-Path $ShortcutFolder 'Silent Type.lnk'))
-$Shortcut.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
-$Shortcut.Arguments = '"' + (Join-Path $PSScriptRoot 'start-silent-type.vbs') + '"'
-$Shortcut.WorkingDirectory = $PSScriptRoot
-$Shortcut.Description = 'Silent typing from your webcam'
-$Shortcut.IconLocation = (Join-Path $PSScriptRoot 'silent_type\silent-type.ico') + ',0'
-$Shortcut.Save()
-Write-Output 'Silent Type is installed. Open it from the Start menu. Startup remains off.'
+if (-not $NoShortcut) {
+    $Shortcut.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
+    $Shortcut.Arguments = '"' + $Launcher + '"'
+    $Shortcut.WorkingDirectory = $PSScriptRoot
+    $Shortcut.Description = 'Camera-only silent typing'
+    $Shortcut.IconLocation = (Join-Path $PSScriptRoot 'silent_type\silent-type.ico') + ',0'
+    $Shortcut.Save()
+}
+if ($SkipModels) {
+    Write-Output 'Dependencies installed. Run install.ps1 without -SkipModels before using the app.'
+} else {
+    Write-Output 'Installed. Open Silent Type Desktop from Start, or double-click start-silent-type.vbs. Startup remains off.'
+}

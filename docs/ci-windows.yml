@@ -31,4 +31,8 @@ jobs:
       - name: Offline tests
         run: python -m unittest discover -s tests -p "test_*.py" -v
       - name: Audit locked runtime
-        run: python -m pip_audit -r requirements-cpu.lock --disable-pip --no-deps
+        run: |
+          python -m pip_audit -r requirements-cpu.lock --disable-pip --no-deps
+          python -m pip_audit -r requirements-cuda.lock --disable-pip --no-deps
+          Set-Content -Path torch-audit.txt -Value 'torch==2.13.0'
+          python -m pip_audit -r torch-audit.txt --disable-pip --no-deps

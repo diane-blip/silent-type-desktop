@@ -9,7 +9,9 @@ from silent_type.app import App
 
 
 def reply(text):
-    return lambda **_: SimpleNamespace(content=[SimpleNamespace(type="text", text=text)])
+    return lambda **_: SimpleNamespace(
+        stop_reason="end_turn", content=[SimpleNamespace(type="text", text=text)]
+    )
 
 
 class PunctuationTests(unittest.TestCase):
@@ -21,14 +23,14 @@ class PunctuationTests(unittest.TestCase):
     def test_adds_punctuation_without_changing_words(self):
         result = module.punctuate(
             "I learned that was the time what do you think",
-            {},
+            {"punctuate": True},
             create=reply("I learned that was the time. What do you think?"),
         )
         self.assertEqual(result, "I learned that was the time. What do you think?")
 
     def test_apostrophes_and_capitals_are_punctuation(self):
         self.assertEqual(
-            module.punctuate("im sure its fine", {}, create=reply("I'm sure it's fine.")),
+            module.punctuate("im sure its fine", {"punctuate": True}, create=reply("I'm sure it's fine.")),
             "I'm sure it's fine.",
         )
 
@@ -41,18 +43,21 @@ class PunctuationTests(unittest.TestCase):
             "Learned was that time, I.",
             "Sure! I learned was that time.",
         ):
-            self.assertEqual(module.punctuate(original, {}, create=reply(changed)), original)
+            self.assertEqual(module.punctuate(original, {"punctuate": True}, create=reply(changed)), original)
 
     def test_failure_disabled_or_missing_key_types_the_original(self):
         def fail(**_):
             raise TimeoutError
 
-        self.assertEqual(module.punctuate("hello there", {}, create=fail), "hello there")
+        self.assertEqual(module.punctuate("hello there", {"punctuate": True}, create=fail), "hello there")
         self.assertEqual(
             module.punctuate("hello there", {"punctuate": False}, create=reply("Hello there.")), "hello there"
         )
         with patch.object(module, "api_key", return_value=None):
-            self.assertEqual(module.punctuate("hello there", {}, create=reply("Hello there.")), "hello there")
+            self.assertEqual(
+                module.punctuate("hello there", {"punctuate": True}, create=reply("Hello there.")),
+                "hello there",
+            )
 
 
 class KeyLookupTests(unittest.TestCase):

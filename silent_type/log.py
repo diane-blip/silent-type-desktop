@@ -1,14 +1,15 @@
 """Running log of every recognized phrase, appended to a markdown file.
 
-Same format as Dictate's log. It defaults to `silent-type-log.md` in this folder
-(ignored by Git, since it holds everything you say). Set `log_path` in
-settings.json to put it somewhere else, such as a synced notes folder.
+It defaults to `silent-type-log.md` in the machine-local data folder, outside
+the source checkout. Set `log_path` in settings.json to use another location.
 """
 
 from datetime import datetime
 from pathlib import Path
 
-DEFAULT = Path(__file__).resolve().parents[1] / "silent-type-log.md"
+from .state import DATA
+
+DEFAULT = DATA / "silent-type-log.md"
 HEADER = """# Silent Type log
 
 Everything Silent Type recognized, newest at the bottom. Appended before each insertion.
@@ -26,9 +27,13 @@ def append_log(text, path=DEFAULT):
         return
     now = datetime.now()
     day_heading = f"## {now:%Y-%m-%d}"
+    path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         path.write_text(HEADER, encoding="utf-8")
-    tail = path.read_text(encoding="utf-8")[-4000:]
+    with path.open("rb") as source:
+        source.seek(0, 2)
+        source.seek(max(0, source.tell() - 4096))
+        tail = source.read().decode("utf-8", errors="replace")
     with open(path, "a", encoding="utf-8", newline="\n") as f:
         if day_heading not in tail:
             f.write(f"\n{day_heading}\n\n")

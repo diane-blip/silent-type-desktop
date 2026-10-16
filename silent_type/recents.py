@@ -1,23 +1,21 @@
 """Recent-phrases popup: left-click the tray icon, click a row (or press its
 digit) to copy that phrase to the clipboard.
 
-Same popup as Dictate's Recents: true rounded corners via the
--transparentcolor trick, DPI-aware sizing, a gold eyebrow and pink only on the
-interactive digit chips.
+Compact keyboard-operable recovery list. The neutral palette is independent of
+the author's brand; copying is always an explicit action.
 """
 
 import ctypes
 import tkinter as tk
 import tkinter.font as tkfont
 
-INK = "#161314"  # container surface
-ROW = "#211d1e"  # row surface
-HOVER = "#2d2728"  # row hover
-EDGE = "#39322f"  # hairline container border
-PAPER = "#FEFCFD"
-MUTED = "#8d8586"
-PINK = "#F0BDCE"
-GOLD = "#AD8326"
+INK = "#172026"
+ROW = "#242e35"
+HOVER = "#34434d"
+EDGE = "#53616a"
+PAPER = "#ffffff"
+MUTED = "#b8c5cc"
+ACCENT = "#8ed8dc"
 TRANSPARENT = "#010203"  # never-drawn key color -> real rounded corners
 
 
@@ -67,9 +65,14 @@ def _ellipsize(font: tkfont.Font, text: str, max_px: int) -> str:
     text = " ".join(text.split())
     if font.measure(text) <= max_px:
         return text
-    while text and font.measure(text + "…") > max_px:
-        text = text[:-1]
-    return text.rstrip() + "…"
+    low, high = 0, len(text)
+    while low < high:
+        mid = (low + high + 1) // 2
+        if font.measure(text[:mid] + "…") <= max_px:
+            low = mid
+        else:
+            high = mid - 1
+    return text[:low].rstrip() + "…"
 
 
 class Recents:
@@ -115,13 +118,13 @@ class Recents:
 
         _round_rect(c, 1, 1, width - 1, height - 1, int(20 * s), fill=INK, outline=EDGE, width=max(1, int(s)))
 
-        eyebrow = " ".join("SILENT TYPE")
+        eyebrow = "Recent phrases"
         c.create_text(
             pad + int(2 * s),
             pad + head_h // 2 - int(3 * s),
             anchor="w",
             text=eyebrow,
-            fill=GOLD,
+            fill=PAPER,
             font=(disp_family, -int(11 * s), "bold"),
         )
         c.create_text(
@@ -151,7 +154,7 @@ class Recents:
                     cx + chip,
                     cy + chip // 2,
                     chip // 2,
-                    fill=PINK,
+                    fill=ACCENT,
                     outline="",
                     tags=tag,
                 )
@@ -191,7 +194,9 @@ class Recents:
             add_row(0, None, "Nothing typed yet.", MUTED, None)
             y += row_h + row_gap
 
-        add_row(n_rows - 1, None, "Open the full log", GOLD, open_log)
+        add_row(n_rows - 1, None, "Open the full log · L", ACCENT, open_log)
+        self.top.bind("l", lambda event: self._digit(event, "L", open_log))
+        self.top.bind("L", lambda event: self._digit(event, "L", open_log))
 
         self.top.bind("<Escape>", lambda e: self._finish(None))
         self.top.bind("<FocusOut>", lambda e: self._finish(None))

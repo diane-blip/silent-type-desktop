@@ -1,68 +1,93 @@
 # Silent Type
 
-Type by mouthing the words. Hold **Right Ctrl + Right Alt**, mouth a sentence at your webcam, let go, and it types at your cursor. No microphone, so I can use it in a coffee shop without narrating my emails to the room.
+**Mouth a phrase at your webcam and type it into your Windows app.** Hold Right Ctrl + Right Alt, wait for Recording, mouth the words, and release either key. No microphone is opened.
 
-It was inspired by [amywork777's Lipflow](https://github.com/amywork777/lipflow), and the lip reading is [Auto-AVSR](https://github.com/mpc001/auto_avsr) from Imperial College London. The hard part is theirs, and it runs entirely on your computer. I built the Windows app around it so it sits next to Dictate: hold-to-type, a Recents popup in the tray, a running log, and a status strip that never shows your words.
+An experimental Windows utility, inspired by [amywork777's Lipflow](https://github.com/amywork777/lipflow), built around [Auto-AVSR](https://github.com/mpc001/auto_avsr) from Imperial College London. Lip-reading accuracy varies with the person, camera, lighting and phrase. Review the result before sending it.
 
-Experimental. Recognition guesses wrong sometimes, so test it on your own face before you use it on client work.
+![Silent Type camera and settings window](docs/images/settings.png)
 
-## Install
+## Download and install
 
-Windows 10/11, Python 3.12 and a webcam.
+1. Download **Silent-Type-0.4.0-windows-source.zip** from [Releases](https://github.com/diane-blip/silent-type-desktop/releases). Extract it to a permanent folder you can write to.
+2. Install **64-bit Python 3.12** from [python.org](https://www.python.org/downloads/windows/) if you do not have it.
+3. Open PowerShell in the extracted folder and run:
 
 ```powershell
-.\install.ps1           # NVIDIA GPU; needs a driver with CUDA 13 (nvidia-smi shows it)
-.\install.ps1 -CpuOnly  # no NVIDIA card
+.\install.ps1        # CPU, works without an NVIDIA GPU
+.\install.ps1 -Cuda  # NVIDIA GPU with a driver supporting CUDA 13
 ```
 
-It builds its own `.venv` from a hash-locked package list, downloads the 1 GB lip-reading model from the official Auto-AVSR link and Google's small MediaPipe face model, checks both by SHA-256, and adds **Silent Type** to the Start menu. On my RTX 5060, text lands 3 to 6 seconds after I let go, including a 24-second phrase. I haven't timed CPU-only; expect it to be slower.
+If Windows blocks the downloaded script, inspect it, then use `Unblock-File .\install.ps1` and retry. If Python is installed elsewhere, pass `-Python 'C:\path\to\python.exe'`. This is a source distribution with an installer, not a signed standalone executable.
 
-Punctuation is optional. Copy `.env.example` to `.env` and add an `ANTHROPIC_API_KEY`, and Claude Haiku adds punctuation and capitals. It only keeps the result when every word matches what was lip-read; anything else, or any error, types the plain words. That step sends the text to Anthropic. Without a key, nothing leaves your computer. If you run Dictate, point `env_file` in settings at its `.env` instead of keeping a second copy of the key.
+The installer creates an isolated Python environment, installs version- and hash-locked packages, downloads and verifies the models, checks the installation, and adds **Silent Type Desktop** to Start. It does not require administrator access, start the app, or enable automatic startup. Allow several GB of free disk space and internet access for installation.
 
-## What I found running it
+The approximately 1 GB lip-reading checkpoint downloads from Auto-AVSR's official link. Its separate use terms are not specified by upstream; read [THIRD_PARTY.md](THIRD_PARTY.md) before installing. We distribute application source, not model weights.
 
-- **Your webcam works for one app at a time.** Silent Type opens it when you hold the keys and lets go 15 seconds after your last phrase, so it never blocks a video call for long. The first hold shows "Starting camera · keep holding" for about two seconds; holds within those 15 seconds start instantly because the last half second is already in memory. Frames are never saved to disk.
-- **The tray menu has an on/off switch** ("Silent Type on"). Off releases the camera at once and ignores the keys; the tray icon turns gray. Turn it off before a call if you've just used it.
-- **No keyboard hook.** It reads the two keys' state every 20 ms. Any other key during the hold cancels it, so Ctrl+Alt shortcuts still work, and Escape cancels too.
-- **Letting go of Alt last opens the app's menu** in anything with a menu bar (Notepad, Explorer), and the text would land in the menu. When a hold starts, Silent Type sends one unassigned key code (0xE8), the same trick AutoHotkey uses, so Windows doesn't treat the release as a menu press. If a menu still opens, the phrase is saved instead of typed.
-- **It types only into the window you started in.** Switch windows before it finishes and the phrase is saved instead of typed. Left-click the tray icon for Recents; click a phrase to copy it.
-- **It reads the biggest face in view**, so people walking behind you don't cancel a phrase.
-- **The strip at the top only says Typed or Saved, not typed** (with the reason), never what you said.
-- **There's no real length limit.** Long holds are read in 10-second parts while you're still going, so the text arrives right after you let go. A cut can land inside a word. A 10-minute stop catches a stuck key and types everything captured.
-- **It refuses Dictate's pair** (Left Ctrl + Left Windows), so the two never fire together.
-- **Laptop keyboards often have no Right Ctrl.** Change the pair in settings.
+## First use
 
-## Settings
+Open **Silent Type Desktop** from Start, or double-click `start-silent-type.vbs`. Right-click its tray icon and choose **Camera and settings**.
 
-`%LOCALAPPDATA%\Silent Type\settings.json`, written on first run. Quit and reopen after editing.
+1. Choose your camera and select **Check camera**. Face forward with your mouth visible, then stop the preview.
+2. Wait for **Ready**. Use **Start recording** to test a phrase without typing into another app.
+3. Click an editable field in the destination app. Hold **Right Ctrl + Right Alt**, wait for the Recording strip, mouth a short phrase, and release either key.
+4. Check the text. Left-click the tray icon to open Recents and copy a saved phrase.
 
-| Setting | Default | |
+Escape cancels recognition. Switching windows causes the result to be saved rather than typed. A partial recognition result is also saved for review. Typing does not touch the clipboard; choosing a phrase in Recents or **Copy selected** does.
+
+The camera opens on demand. A cold start can take a few seconds; wait for Recording. It closes 15 seconds after the last phrase. Turn **Silent Type on** off in the tray to release the camera before a video call.
+
+## Privacy and punctuation
+
+Recognition and face detection run locally. Video stays in memory, including a half-second buffer while the camera is warm, and is never saved by the app. Text is saved locally in recovery history and a Markdown log. There is no app telemetry.
+
+Claude punctuation is **off by default**. To enable it, copy `.env.example` to `.env`, add your Anthropic API key, and check **Use Claude for punctuation** in settings. This sends recognized text to Anthropic and incurs API usage charges. The response is accepted only if the words stay the same and the response completed; otherwise the original text is kept. Turn the setting off to keep recognition entirely local.
+
+## Settings and stored data
+
+Settings, history, logs and models live in `%LOCALAPPDATA%\Silent Type Desktop`. This edition has separate storage and shortcuts from earlier private/member installations.
+
+Edit `settings.json` while the app is closed. Invalid or unknown values produce an error instead of silently changing behavior.
+
+| Setting | Default | Meaning |
 |---|---|---|
-| `hold_pair` | `[163, 165]` | Two of: Left Ctrl 162, Right Ctrl 163, Left Alt 164, Right Alt 165, Left Windows 91, Right Windows 92 |
-| `camera_warm_seconds` | `15` | How long the camera stays open after your last phrase |
-| `punctuate` | `true` | `false` keeps everything local even with a key |
-| `names` | `[]` | Names whose casing gets restored, like `"Cyberdyne Systems"` |
-| `log_path` | empty | Where the log goes; empty means `silent-type-log.md` in this folder (ignored by Git) |
-| `env_file` | empty | Another `.env` to read `ANTHROPIC_API_KEY` from |
-| `max_seconds` | `600` | The stuck-key stop |
+| `camera` | first available | Camera name; choose in the app |
+| `device` | `auto` | `auto`, `cpu` or `cuda`; explicit CUDA fails if unavailable |
+| `beam` | `4` | Recognition search width, 1–16 |
+| `hold_enabled` | `true` | Enable the held-key control |
+| `hold_pair` | `[163,165]` | Two distinct Ctrl, Alt or Windows key codes |
+| `camera_warm_seconds` | `15` | Idle camera hold, 0–60 seconds |
+| `max_seconds` | `600` | Recording safety stop, 1–600 seconds |
+| `punctuate` | `false` | Opt in to Anthropic punctuation |
+| `punctuate_model` | `claude-haiku-5-5` | Anthropic model name |
+| `names` | `[]` | Names whose casing should be restored |
+| `log_path` | empty | Optional alternate Markdown log path |
+| `env_file` | empty | Optional alternate API-key file |
+| `model_path`, `face_model_path` | data folder | Official model locations; exact hashes are required |
 
-The model, history and app logs live in the same `%LOCALAPPDATA%\Silent Type` folder. Choose a different camera from the tray: **Camera and settings**.
+Key codes: Left/Right Ctrl 162/163, Left/Right Alt 164/165, Left/Right Windows 91/92. Left Ctrl + Left Windows is reserved for Dictate; Left Ctrl + Right Alt is rejected because AltGr can generate it. Some laptops need a different pair.
 
-## Update and uninstall
+**Clear history** removes the recovery database's phrases. It does not delete the separate Markdown log, exported text, system backups or filesystem snapshots. Delete those separately if needed.
 
-Update: quit Silent Type from the tray, `git pull`, delete `.venv`, and run `install.ps1` again. Settings, history and models stay where they are, and the models are rechecked, not downloaded again. The [changelog](CHANGELOG.md) lists what changed.
+## Limits and troubleshooting
 
-Uninstall: quit it, delete this folder, `%LOCALAPPDATA%\Silent Type` and the **Silent Type** shortcut in `%APPDATA%\Microsoft\Windows\Start Menu\Programs`.
+- **Wrong words:** test shorter phrases, face the camera and improve lighting. The model guesses words; this is not a verified accessibility replacement or an accuracy guarantee.
+- **Slow CPU:** processing may take longer than speaking. The queue is bounded; an overloaded session stops instead of accumulating video indefinitely. NVIDIA acceleration is recommended for frequent use, but no universal timing is promised.
+- **Long phrases:** recordings are read in 10-second parts. A boundary can split a word. Ten minutes is the safety ceiling, not a tested practical target.
+- **Saved, not typed:** recover from Recents. The guard follows the foreground window, not individual fields inside it. Switching fields within the same window is not detected. Focus changes during insertion can leave partial text.
+- **App menus or elevated apps:** menu state and Windows input restrictions can block insertion. Do not run the app as administrator to bypass them.
+- **Camera unavailable:** stop other camera apps and choose the correct camera. Camera sharing depends on the driver.
+- **Cannot start:** open `silent-type.log` in the data folder. Run `.venv\Scripts\python.exe doctor.py` for diagnostics.
 
-## Checks
+## Update or remove
 
-```powershell
-.venv\Scripts\python -m unittest discover -s tests -p "test_*.py"
-.venv\Scripts\pythonw -m silent_type.acceptance
-```
+Quit from the tray before updating. Extract the next release into a new permanent folder, keep the old folder until verified, and remove the old **Silent Type Desktop** shortcut before running the new installer. The installer refuses to overwrite a shortcut pointing to another installation. Data remains in its own folder.
 
-The first runs the behavior tests. The second is a five-minute review run: hold your pair, mouth a phrase, and the recognized words show on the strip without typing into anything. `python -m tests.app_smoke`, `tests.hold_pipeline` and `tests.delivery_pipeline` exercise the real camera and model; the last one presses Right Ctrl + Right Alt through Windows, types a fixed phrase into a test window and checks the camera is released, so keep your hands off the keyboard while it runs. [CONTRIBUTING.md](CONTRIBUTING.md) has the lint and audit steps and how the modules fit together.
+To uninstall, quit, delete the installation folder and its Start-menu shortcut. To remove saved text and models too, delete `%LOCALAPPDATA%\Silent Type Desktop` and any custom log. API keys in a custom `env_file` belong to that file's owner and are not removed.
 
-## Credits and terms
+## Origin, license and contributions
 
-App code: MIT, see [LICENSE](LICENSE). Auto-AVSR code in `vendor/auto_avsr/` is unchanged and Apache 2.0, and the MediaPipe face model is Google's, Apache 2.0; [THIRD_PARTY.md](THIRD_PARTY.md) has the provenance and the citation. Upstream doesn't state terms for this checkpoint, and each install downloads its own copy, so check it against how you plan to use it.
+The camera-only silent-typing idea came from **Lipflow**, not this project. Silent Type is a separately implemented Windows application with its own tray controls, camera lifecycle, recoverable history, guarded insertion and releases. It was built to fit a workflow alongside Dictate and Snip. Lipflow also supports Windows; Windows support is not our originality claim. No Lipflow application code is included.
+
+**Auto-AVSR** provides the recognition work. Credit: Pingchuan Ma, Alexandros Haliassos, Adriana Fernandez-Lopez, Honglie Chen, Stavros Petridis and Maja Pantic, Imperial College London. The application is MIT-licensed; vendored recognition code is Apache 2.0. Model terms are separate. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and checks, [SECURITY.md](SECURITY.md) for private reports, and [verification](docs/verification.md) for tested behavior and remaining limits.

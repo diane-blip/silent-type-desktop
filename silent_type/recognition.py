@@ -95,6 +95,10 @@ class Recognizer:
 
         self.torch = torch
         torch.set_num_threads(min(2, torch.get_num_threads()))
+        if config["device"] == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA was requested but is unavailable. Install compatible drivers or choose cpu."
+            )
         self.device = "cuda" if config["device"] != "cpu" and torch.cuda.is_available() else "cpu"
         self.tokens = (
             ["<blank>"]
@@ -110,6 +114,13 @@ class Recognizer:
         path = Path(config["model_path"])
         if not path.is_file():
             raise RuntimeError("Model missing. Run install.ps1 to download it.")
+        from download_model import CHECKPOINT, FACE_MODEL, sha256
+
+        for model_path, expected in ((path, CHECKPOINT["sha256"]), (self.face_model, FACE_MODEL["sha256"])):
+            if not model_path.is_file() or sha256(model_path) != expected:
+                raise RuntimeError(
+                    "Model integrity check failed. Reinstall the official model before starting."
+                )
         self.model = E2E(len(self.tokens), "video")
         state = torch.load(path, map_location="cpu", weights_only=True)
         self.model.load_state_dict(state.get("state_dict", state), strict=True)
