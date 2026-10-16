@@ -53,4 +53,4 @@ No AI models from Chinese organizations, as a dependency or an optional backend.
 
 ## CI
 
-`docs/ci-windows.yml` runs lint, formatting, the offline tests and the audit on Windows. To turn it on in your copy, move it to `.github/workflows/`; pushing a workflow file needs a GitHub token with the `workflow` scope.
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml) runs lint, formatting, offline tests, package consistency and dependency audits on Windows for main pushes and pull requests. Actions are pinned to exact commits and receive read-only repository access; checkout credentials are not persisted.
